@@ -1,28 +1,26 @@
-# GraphQL schema example
-#
-# https://gqlgen.com/getting-started/
-
-type Todo {
-  id: ID!
-  text: String!
-  done: Boolean!
-  user: User!
+type Review {
+    body: String!
+    author: User! @external @provides(fields: "username")
+    product: Product!
 }
 
-type User {
-  id: ID!
-  name: String!
+extend type EmailHost @key(fields: "id") {
+    id: String! @external
 }
 
-type Query {
-  todos: [Todo!]!
+extend type User @key(fields: "id") {
+    id: ID! @external
+    host: EmailHost! @external
+    email: String! @external
+    reviews: [Review] @requires(fields: "host {id} email")
 }
 
-input NewTodo {
-  text: String!
-  userId: String!
+extend type Manufacturer @key(fields: "id") {
+    id: String! @external
 }
 
-type Mutation {
-  createTodo(input: NewTodo!): Todo!
+extend type Product @key(fields: " manufacturer{  id} id") {
+    id: String! @external
+    manufacturer: Manufacturer! @external
+    reviews: [Review]
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/site-tech/subgraph-two-poc/graph/generated"
 )
 
-const defaultPort = "8080"
+const defaultPort = "8082"
 
 func main() {
 	port := os.Getenv("PORT")
@@ -22,9 +22,6 @@ func main() {
 	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{}}))
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
-	http.HandleFunc("/schema", func(rw http.ResponseWriter, r *http.Request) {
-		http.ServeFile(rw, r, "graph/schema.graphqls")
-	})
 	http.Handle("/query", srv)
 
 	log.Printf("connect to http://localhost:%s/ for GraphQL playground", port)

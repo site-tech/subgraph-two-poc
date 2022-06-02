@@ -298,7 +298,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 var sources = []*ast.Source{
 	{Name: "../schema.graphqls", Input: `type Review {
     body: String!
-    author: User! @provides(fields: "username")
+    author: User! @external @provides(fields: "username")
     product: Product!
 }
 

@@ -13,26 +13,3 @@ type Manufacturer struct {
 }
 
 func (Manufacturer) IsEntity() {}
-
-type Product struct {
-	ID           string        `json:"id"`
-	Manufacturer *Manufacturer `json:"manufacturer"`
-	Reviews      []*Review     `json:"reviews"`
-}
-
-func (Product) IsEntity() {}
-
-type Review struct {
-	Body    string   `json:"body"`
-	Author  *User    `json:"author"`
-	Product *Product `json:"product"`
-}
-
-type User struct {
-	ID      string     `json:"id"`
-	Host    *EmailHost `json:"host"`
-	Email   string     `json:"email"`
-	Reviews []*Review  `json:"reviews"`
-}
-
-func (User) IsEntity() {}

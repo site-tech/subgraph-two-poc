@@ -38,6 +38,7 @@ type Config struct {
 
 type ResolverRoot interface {
 	Entity() EntityResolver
+	User() UserResolver
 }
 
 type DirectiveRoot struct {
@@ -89,6 +90,9 @@ type ComplexityRoot struct {
 type EntityResolver interface {
 	FindProductByManufacturerIDAndID(ctx context.Context, manufacturerID string, id string) (*model.Product, error)
 	FindUserByID(ctx context.Context, id string) (*model.User, error)
+}
+type UserResolver interface {
+	Reviews(ctx context.Context, obj *model.User) ([]*model.Review, error)
 }
 
 type executableSchema struct {
@@ -294,7 +298,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 var sources = []*ast.Source{
 	{Name: "../schema.graphqls", Input: `type Review {
     body: String!
-    author: User! @external @provides(fields: "username")
+    author: User! @provides(fields: "username")
     product: Product!
 }
 
@@ -328,12 +332,7 @@ extend type Product @key(fields: " manufacturer{  id} id") {
 	directive @provides(fields: _FieldSet!) on FIELD_DEFINITION
 	directive @extends on OBJECT | INTERFACE
 
-	directive @key(fields: _FieldSet!, resolvable: Boolean) repeatable on OBJECT | INTERFACE
-	directive @link(import: [String!], url: String!) repeatable on SCHEMA
-	directive @shareable on OBJECT | FIELD_DEFINITION
-	directive @tag repeatable on OBJECT | FIELD_DEFINITION | INTERFACE | UNION
-	directive @override(from: String!) on FIELD_DEFINITION
-	directive @inaccessible on SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION
+	directive @key(fields: _FieldSet!) repeatable on OBJECT | INTERFACE
 `, BuiltIn: true},
 	{Name: "../../federation/entity.graphql", Input: `
 # a union of all types that use the @key directive
@@ -1358,7 +1357,7 @@ func (ec *executionContext) _User_reviews(ctx context.Context, field graphql.Col
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Reviews, nil
+		return ec.resolvers.User().Reviews(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1376,8 +1375,8 @@ func (ec *executionContext) fieldContext_User_reviews(ctx context.Context, field
 	fc = &graphql.FieldContext{
 		Object:     "User",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "body":
@@ -3568,26 +3567,39 @@ func (ec *executionContext) _User(ctx context.Context, sel ast.SelectionSet, obj
 			out.Values[i] = ec._User_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "host":
 
 			out.Values[i] = ec._User_host(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "email":
 
 			out.Values[i] = ec._User_email(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "reviews":
+			field := field
 
-			out.Values[i] = ec._User_reviews(ctx, field, obj)
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._User_reviews(ctx, field, obj)
+				return res
+			}
 
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4480,44 +4492,6 @@ func (ec *executionContext) unmarshalOString2string(ctx context.Context, v inter
 func (ec *executionContext) marshalOString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	res := graphql.MarshalString(v)
 	return res
-}
-
-func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
-	if v == nil {
-		return nil, nil
-	}
-	var vSlice []interface{}
-	if v != nil {
-		vSlice = graphql.CoerceList(v)
-	}
-	var err error
-	res := make([]string, len(vSlice))
-	for i := range vSlice {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
-		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalOString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
-	}
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
